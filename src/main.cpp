@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <Wire.h>
 #include "wifi/WiFiManager.h"
 #include "state/StateManager.h"
 #include "nfc/NFCReader.h"
@@ -6,52 +7,54 @@
 #include "servo/ServoMotor.h"
 #include "display/DisplayOLED.h"
 
-// Configuración WiFi
-const char* WIFI_SSID = "Ray";
-const char* WIFI_PASSWORD = "10021976@";
-
-// Configuración de pines
+// Pines
 #define SENSOR_PIN 26
 #define SERVO_PIN 18
-#define SDA_PIN 21
-#define SCL_PIN 22
 
-// Configuración del sistema
+#define PN532_SDA 21
+#define PN532_SCL 22
+
+#define OLED_SDA 4
+#define OLED_SCL 5
+
+// Parámetros
 #define POINTS_PER_METAL 10
 #define IDLE_TIMEOUT 15000
 
-// Módulos del sistema
 MetalSensor metal(SENSOR_PIN);
 ServoMotor servo(SERVO_PIN, 0, 180);
-NFCReader nfc(SDA_PIN, SCL_PIN);
-DisplayOLED display(128, 64);
+NFCReader nfc(PN532_SDA, PN532_SCL);
+DisplayOLED display(128, 64, &Wire1);
 
-// Gestores
-WiFiManager wifiManager(WIFI_SSID, WIFI_PASSWORD);
-StateManager stateManager(&metal, &servo, &nfc, &display, POINTS_PER_METAL, IDLE_TIMEOUT);
+WiFiManager wifi("Ray", "10021976@", LED_BUILTIN, &display);
+
+StateManager state(&metal, &servo, &nfc, &display,
+                    POINTS_PER_METAL, IDLE_TIMEOUT);
 
 void setup() {
   Serial.begin(115200);
-  delay(200);
 
-  // Conectar WiFi
-  wifiManager.begin();
+  Wire.begin(PN532_SDA, PN532_SCL);
+  Wire1.begin(OLED_SDA, OLED_SCL, 400000);
 
-  // Inicializar módulos de hardware
+  // Inicializar display y mostrar logo
+  display.begin();
+  display.showLogo();
+  delay(2000);
+
+  // Inicializar módulos
   metal.begin();
   servo.begin();
   nfc.begin();
-  
-  if (!display.begin()) {
-    Serial.println("❌ Error: Display no detectado");
-    while (true) delay(1000);
-  }
 
-  // Iniciar máquina de estados
-  stateManager.begin();
+  // Conectar WiFi con animación en OLED
+  wifi.begin();
+
+  // Iniciar estado
+  state.begin();
 }
 
 void loop() {
-  stateManager.update();
-  delay(100);
+  state.update();
+  delay(30);
 }

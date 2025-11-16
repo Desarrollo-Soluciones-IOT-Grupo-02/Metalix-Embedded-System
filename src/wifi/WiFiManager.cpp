@@ -1,9 +1,10 @@
 #include "WiFiManager.h"
 
-WiFiManager::WiFiManager(const char* ssid, const char* password, int ledPin) {
+WiFiManager::WiFiManager(const char* ssid, const char* password, int ledPin, DisplayOLED* display) {
   this->ssid = ssid;
   this->password = password;
   this->ledPin = ledPin;
+  this->display = display;
 }
 
 void WiFiManager::begin() {
@@ -16,6 +17,10 @@ void WiFiManager::begin() {
   
   int attempts = 0;
   while (WiFi.status() != WL_CONNECTED && attempts < 20) {
+    if (display) {
+      int dots = attempts % 4;
+      display->showWiFiConnecting(dots);
+    }
     delay(500);
     Serial.print(".");
     attempts++;
@@ -26,6 +31,10 @@ void WiFiManager::begin() {
     Serial.print("IP: ");
     Serial.println(WiFi.localIP());
     digitalWrite(ledPin, HIGH);
+    if (display) {
+      String ip = WiFi.localIP().toString();
+      display->showWiFiConnected(ip);
+    }
   } else {
     Serial.println("\n❌ No se pudo conectar a WiFi");
     digitalWrite(ledPin, LOW);

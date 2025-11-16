@@ -68,139 +68,229 @@ const unsigned char metalix_logo [] PROGMEM = {
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
 };
 
-DisplayOLED::DisplayOLED(int width, int height)
-: oled(width, height, &Wire, -1) {}
+DisplayOLED::DisplayOLED(int width, int height, TwoWire* bus)
+: width(width), height(height), i2cBus(bus), oled(nullptr)
+{}
 
 bool DisplayOLED::begin() {
-    Wire.begin(21, 22);
-    Wire.setClock(400000);
+    oled = new Adafruit_SSD1306(width, height, i2cBus, -1);
     
-    bool success = oled.begin(SSD1306_SWITCHCAPVCC, 0x3C);
-    
-    if (success) {
-        oled.ssd1306_command(0xDA);
-        oled.ssd1306_command(0x12);
-        
-        oled.ssd1306_command(0xD3);
-        oled.ssd1306_command(0x00); 
-        
-        oled.clearDisplay();
-        oled.display();
+    if (!oled->begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
+        Serial.println("❌ OLED no detectado en el bus I2C proporcionado");
+        return false;
     }
-    
-    return success;
+
+    oled->clearDisplay();
+    oled->display();
+    Serial.println("✅ OLED iniciado correctamente");
+    return true;
 }
 
 void DisplayOLED::showLogo() {
-    oled.clearDisplay();
-    oled.drawBitmap(0, 0, metalix_logo, 128, 64, SSD1306_WHITE);
-    oled.display();
+    oled->clearDisplay();
+    oled->drawBitmap(0, 0, metalix_logo, 128, 64, SSD1306_WHITE);
+    oled->display();
 }
 
 void DisplayOLED::showMessage(const String& msg) {
-    oled.clearDisplay();
-    oled.setTextSize(2);
-    oled.setTextColor(SSD1306_WHITE);
-    oled.setCursor(0, 20);
-    oled.println(msg);
-    oled.display();
+    oled->clearDisplay();
+    oled->setTextSize(2);
+    oled->setTextColor(SSD1306_WHITE);
+    oled->setCursor(0, 20);
+    oled->println(msg);
+    oled->display();
 }
 
 void DisplayOLED::showWelcome() {
-    oled.clearDisplay();
-    
-    oled.drawRect(1, 1, 126, 62, SSD1306_WHITE);
-    oled.drawRect(3, 3, 122, 58, SSD1306_WHITE);
-    
-    oled.setTextSize(1);
-    oled.setTextColor(SSD1306_WHITE);
-    
-    oled.setCursor(16, 26);
-    oled.print("Ingrese metal");
-    
-    oled.setCursor(22, 40);
-    oled.print("para iniciar");
-    
-    oled.display();
+    oled->clearDisplay();
+
+    // Marco exterior (igual que Redeem)
+    oled->drawRect(1, 1, 126, 62, SSD1306_WHITE);
+    oled->drawRect(3, 3, 122, 58, SSD1306_WHITE);
+
+    // ----- Texto 1 -----
+    const char* line1 = "INGRESE";
+    oled->setTextSize(2);
+    oled->setTextColor(SSD1306_WHITE);
+
+    int16_t x1, y1;
+    uint16_t w1, h1;
+    oled->getTextBounds(line1, 0, 0, &x1, &y1, &w1, &h1);
+
+    oled->setCursor((128 - w1) / 2, 15);
+    oled->print(line1);
+
+    // ----- Texto 2 -----
+    const char* line2 = "METAL";
+    oled->setTextSize(2);
+
+    oled->getTextBounds(line2, 0, 0, &x1, &y1, &w1, &h1);
+    oled->setCursor((128 - w1) / 2, 35);
+    oled->print(line2);
+
+    oled->display();
 }
 
 void DisplayOLED::showPoints(int points) {
-    oled.clearDisplay();
-    
-    oled.drawRect(2, 2, 124, 60, SSD1306_WHITE);
-    
-    oled.setTextSize(1);
-    oled.setTextColor(SSD1306_WHITE);
-    
-    oled.setCursor(45, 8);
-    oled.print("PUNTOS");
-    
-    oled.drawLine(10, 18, 118, 18, SSD1306_WHITE);
-    
-    oled.setTextSize(2);
+    oled->clearDisplay();
+
+    // Marco doble (seguro para que no se corte)
+    oled->drawRect(1, 1, 126, 62, SSD1306_WHITE);
+    oled->drawRect(3, 3, 122, 58, SSD1306_WHITE);
+
+    // ---- Título "PUNTOS" ----
+    const char* title = "PUNTOS";
+    oled->setTextSize(2);
+    oled->setTextColor(SSD1306_WHITE);
+
+    int16_t x1, y1;
+    uint16_t w1, h1;
+    oled->getTextBounds(title, 0, 0, &x1, &y1, &w1, &h1);
+
+    oled->setCursor((128 - w1) / 2, 10);
+    oled->print(title);
+
+    // Línea debajo del título
+    oled->drawLine(10, 30, 118, 30, SSD1306_WHITE);
+
+    // ---- Valor de puntos centrado ----
     String ptsStr = String(points);
-    int ptsWidth = ptsStr.length() * 12;
-    int ptsX = (128 - ptsWidth) / 2;
-    oled.setCursor(ptsX, 26);
-    oled.print(points);
-    
-    oled.setTextSize(1);
-    oled.setCursor(10, 48);
-    oled.print("Siga insertando");
-    
-    oled.display();
+
+    oled->getTextBounds(ptsStr, 0, 0, &x1, &y1, &w1, &h1);
+    oled->setCursor((128 - w1) / 2, 30);
+    oled->print(ptsStr);
+
+    // ---- Texto inferior ----
+    oled->setTextSize(1);
+    oled->setCursor(20, 50);
+    oled->print("Siga insertando");
+
+    oled->display();
 }
 
 void DisplayOLED::showRedeemMessage() {
-    oled.clearDisplay();
+    oled->clearDisplay();
     
-    oled.drawRect(1, 1, 126, 62, SSD1306_WHITE);
-    oled.drawRect(3, 3, 122, 58, SSD1306_WHITE);
+    oled->drawRect(1, 1, 126, 62, SSD1306_WHITE);
+    oled->drawRect(3, 3, 122, 58, SSD1306_WHITE);
     
-    oled.setTextSize(1);
-    oled.setTextColor(SSD1306_WHITE);
+    oled->setTextSize(1);
+    oled->setTextColor(SSD1306_WHITE);
     
-    oled.fillRect(48, 12, 32, 18, SSD1306_WHITE);
-    oled.fillRect(50, 14, 28, 14, SSD1306_BLACK);
-    oled.drawLine(50, 20, 78, 20, SSD1306_WHITE);
+    oled->fillRect(48, 12, 32, 18, SSD1306_WHITE);
+    oled->fillRect(50, 14, 28, 14, SSD1306_BLACK);
+    oled->drawLine(50, 20, 78, 20, SSD1306_WHITE);
     
-    oled.setCursor(10, 36);
-    oled.print("Pase su tarjeta");
+    oled->setCursor(20, 36);
+    oled->print("Pase su tarjeta");
     
-    oled.setCursor(22, 48);
-    oled.print("para canjear");
+    oled->setCursor(32, 48);
+    oled->print("para canjear");
     
-    oled.display();
+    oled->display();
 }
 
-void DisplayOLED::showRedeemSuccess(int points) {
-    oled.clearDisplay();
+void DisplayOLED::showRedeemSuccess(int points, String uid) {
+    oled->clearDisplay();
+
+    // Marco doble elegante (no se corta nunca)
+    oled->drawRect(1, 1, 126, 62, SSD1306_WHITE);
+    oled->drawRect(3, 3, 122, 58, SSD1306_WHITE);
+
+    // ---- Título "CANJEADO!" centrado ----
+    const char* title = "CANJEADO!";
+    oled->setTextSize(2);
+    oled->setTextColor(SSD1306_WHITE);
+
+    int16_t x1, y1;
+    uint16_t w, h;
+
+    oled->getTextBounds(title, 0, 0, &x1, &y1, &w, &h);
+    oled->setCursor(((128 - w) / 2)+5, 10);
+    oled->print(title);
+
+    // Línea debajo del título
+    oled->drawLine(10, 28, 118, 28, SSD1306_WHITE);
+
+    // ---- Puntos grandes y centrados ----
+    String ptsStr = String(points) + " pts";
+
+    oled->setTextSize(2);
+    oled->getTextBounds(ptsStr, 0, 0, &x1, &y1, &w, &h);
+    oled->setCursor((128 - w) / 2, 30);
+    oled->print(ptsStr);
+
+    // ---- UID más pequeño abajo ----
+    oled->setTextSize(1);
+    String uidLabel = "UID: " + uid;
+
+    oled->getTextBounds(uidLabel, 0, 0, &x1, &y1, &w, &h);
+    oled->setCursor((128 - w) / 2, 48);
+    oled->print(uidLabel);
+
+    oled->display();
+}
+
+void DisplayOLED::showWiFiConnecting(int dots) {
+    oled->clearDisplay();
+
+    // Marco doble elegante
+    oled->drawRect(1, 1, 126, 62, SSD1306_WHITE);
+    oled->drawRect(3, 3, 122, 58, SSD1306_WHITE);
+
+    oled->setTextSize(1);
+    oled->setTextColor(SSD1306_WHITE);
+
+    // Título centrado
+    String title = "Conectando WiFi";
+    int16_t x1, y1; uint16_t w, h;
+    oled->getTextBounds(title, 0, 0, &x1, &y1, &w, &h);
+    oled->setCursor((128 - w) / 2, 20);
+    oled->print(title);
+
+    // Animación de puntos (...)
+    String dotsStr = "";
+    for (int i = 0; i < dots; i++) dotsStr += ".";
+
+    oled->getTextBounds(dotsStr, 0, 0, &x1, &y1, &w, &h);
+    oled->setCursor((128 - w) / 2, 38);
+    oled->print(dotsStr);
+
+    oled->display();
     
-    oled.drawRect(2, 2, 124, 60, SSD1306_WHITE);
-    
-    oled.setTextSize(2);
-    oled.setTextColor(SSD1306_WHITE);
-    
-    oled.setCursor(16, 6);
-    oled.print("CANJEADO!");
-    
-    oled.drawLine(10, 24, 118, 24, SSD1306_WHITE);
-    
-    oled.setTextSize(2);
-    String ptsText = String(points) + " pts";
-    int ptsWidth = ptsText.length() * 12;
-    int ptsX = (128 - ptsWidth) / 2;
-    oled.setCursor(ptsX, 30);
-    oled.print(ptsText);
-    
-    oled.setTextSize(1);
-    oled.setCursor(40, 50);
-    oled.print("Gracias!");
-    
-    oled.display();
+    // Log para verificar que se está mostrando
+    Serial.print("OLED: Conectando WiFi");
+    for (int i = 0; i < dots; i++) Serial.print(".");
+    Serial.println();
+}
+
+void DisplayOLED::showWiFiConnected(String ip) {
+    oled->clearDisplay();
+
+    // Marco doble
+    oled->drawRect(1, 1, 126, 62, SSD1306_WHITE);
+    oled->drawRect(3, 3, 122, 58, SSD1306_WHITE);
+
+    oled->setTextSize(1);
+    oled->setTextColor(SSD1306_WHITE);
+
+    // Título centrado
+    String title = "WiFi Conectado!";
+    int16_t x1, y1; uint16_t w, h;
+    oled->getTextBounds(title, 0, 0, &x1, &y1, &w, &h);
+    oled->setCursor((128 - w) / 2, 14);
+    oled->print(title);
+
+    // IP centrada
+    String ipStr = "IP: " + ip;
+    oled->getTextBounds(ipStr, 0, 0, &x1, &y1, &w, &h);
+    oled->setCursor((128 - w) / 2, 36);
+    oled->print(ipStr);
+    oled->display();
+    delay(5000);
 }
 
 void DisplayOLED::clear() {
-    oled.clearDisplay();
-    oled.display();
+    oled->clearDisplay();
+    oled->display();
 }

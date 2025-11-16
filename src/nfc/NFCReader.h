@@ -1,18 +1,22 @@
-#ifndef NFC_READER_H
-#define NFC_READER_H
+#ifndef NFCREADER_H
+#define NFCREADER_H
 
 #include <Arduino.h>
-#include <Wire.h>
 #include <Adafruit_PN532.h>
 
 class NFCReader {
-private:
-    Adafruit_PN532 nfc;
-
 public:
     NFCReader(int sda, int scl);
     void begin();
-    bool readCard(String &uidString);
+    bool readCard(String &uidOut);
+
+private:
+    Adafruit_PN532 nfc;
+
+    unsigned long lastRead = 0;
+    const int interval = 80; 
+    unsigned long lastSuccessfulRead = 0;
+    unsigned long lastLogTime = 0;
 };
 
 #endif

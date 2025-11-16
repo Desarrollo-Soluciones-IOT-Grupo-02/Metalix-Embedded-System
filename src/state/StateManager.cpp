@@ -1,120 +1,185 @@
 #include "StateManager.h"
 
-StateManager::StateManager(MetalSensor* metal, ServoMotor* servo, NFCReader* nfc, 
-                           DisplayOLED* display, int pointsPerMetal, unsigned long idleTimeout) {
+StateManager::StateManager(MetalSensor* metal, ServoMotor* servo, NFCReader* nfc,
+                           DisplayOLED* display, int ppm, unsigned long idle)
+{
   this->metal = metal;
   this->servo = servo;
   this->nfc = nfc;
   this->display = display;
-  this->pointsPerMetal = pointsPerMetal;
-  this->idleTimeout = idleTimeout;
-  this->currentState = STATE_LOGO;
-  this->points = 0;
-  this->lastActivity = 0;
-  this->metalWasDetected = false;
+
+  this->pointsPerMetal = ppm;
+  this->idleTimeout = idle;
+
+  currentState = STATE_LOGO;
+
+  points = 0;
+  lastActivity = 0;
+
+  metalLast = false;
+  cardLast = false;
+
+  welcomeShown = false;
+  collectingShown = false;
+  redeemShown = false;
+
+  servoOpen = false;
+  servoTimer = 0;
+
+  redeemWait = false;
+  redeemTimer = 0;
+
+  redeemCooldown = false;
+  redeemCooldownTimer = 0;
+
+  lastRedeemedUID = "";
 }
 
 void StateManager::begin() {
   display->showLogo();
-  Serial.println("✅ Sistema iniciado - Mostrando logo");
-  delay(3000);
-  
+  delay(2000);
+
   currentState = STATE_WELCOME;
   display->showWelcome();
-  Serial.println("Estado: BIENVENIDA");
+  welcomeShown = true;
+
   lastActivity = millis();
 }
 
 void StateManager::update() {
+
+  // ------------------------------
+  // Servo no bloqueante
+  // ------------------------------
+  if (servoOpen && millis() - servoTimer >= 2000) {
+    servo->close();
+    servoOpen = false;
+  }
+
+  // ------------------------------
+  // Pantalla final no bloqueante
+  // ------------------------------
+  if (redeemWait && millis() - redeemTimer >= 2500) {
+    redeemWait = false;
+    resetToWelcome();
+  }
+
+  // ------------------------------
+  // Cooldown para evitar canjes múltiples
+  // ------------------------------
+  if (redeemCooldown && millis() - redeemCooldownTimer >= 3000) {
+    redeemCooldown = false;
+  }
+
+  // ------------------------------
+  // Lectura de sensores
+  // ------------------------------
   bool metalDetected = metal->isMetalDetected();
+
   String uid;
   bool cardDetected = nfc->readCard(uid);
 
+  // ------------------------------
+  // Máquina de estados
+  // ------------------------------
   switch (currentState) {
+
     case STATE_WELCOME:
       handleWelcome(metalDetected);
       break;
-      
+
     case STATE_COLLECTING:
       handleCollecting(metalDetected, cardDetected, uid);
       break;
-      
+
     case STATE_REDEEM:
       handleRedeem(metalDetected, cardDetected, uid);
       break;
-      
-    case STATE_LOGO:
+
+    default:
       break;
   }
+
+  metalLast = metalDetected;
+  cardLast = cardDetected;
 }
 
-void StateManager::handleWelcome(bool metalDetected) {
-  if (metalDetected && !metalWasDetected) {
+void StateManager::handleWelcome(bool metal) {
+
+  if (!welcomeShown) {
+    display->showWelcome();
+    welcomeShown = true;
+  }
+
+  if (metal && !metalLast) {
     points = pointsPerMetal;
-    Serial.println("🧲 Primer metal detectado - Iniciando recolección");
-    
-    openAndCloseServo();
-    
-    currentState = STATE_COLLECTING;
+
+    openServoAsync();
     display->showPoints(points);
-    Serial.print("Puntos: ");
-    Serial.println(points);
+
+    collectingShown = false;
+    welcomeShown = false;
+
     lastActivity = millis();
+    currentState = STATE_COLLECTING;
   }
-  metalWasDetected = metalDetected;
 }
 
-void StateManager::handleCollecting(bool metalDetected, bool cardDetected, String uid) {
-  // Acumulando puntos por cada metal
-  if (metalDetected && !metalWasDetected) {
-    points += pointsPerMetal;
-    Serial.print("🧲 Metal detectado - Puntos: ");
-    Serial.println(points);
-    
-    openAndCloseServo();
-    
+void StateManager::handleCollecting(bool metal, bool card, String uid) {
+
+  if (!collectingShown) {
     display->showPoints(points);
+    collectingShown = true;
+  }
+
+  if (metal && !metalLast) {
+    points += pointsPerMetal;
+
+    openServoAsync();
+    display->showPoints(points);
+
     lastActivity = millis();
   }
-  metalWasDetected = metalDetected;
-  
-  // Timeout sin actividad: mostrar mensaje de canje
-  if (points > 0 && (millis() - lastActivity > idleTimeout)) {
+
+  if (points > 0 && millis() - lastActivity > idleTimeout) {
+    redeemShown = false;
     currentState = STATE_REDEEM;
-    display->showRedeemMessage();
-    Serial.println("Estado: ESPERANDO TARJETA PARA CANJE");
+    return;
   }
-  
-  // Si pasa tarjeta mientras recolecta
-  if (cardDetected && points > 0) {
+
+  if (card && !cardLast) {
     redeemPoints(uid);
   }
 }
 
-void StateManager::handleRedeem(bool metalDetected, bool cardDetected, String uid) {
-  if (cardDetected) {
+void StateManager::handleRedeem(bool metal, bool card, String uid) {
+
+  if (!redeemShown) {
+    display->showRedeemMessage();
+    redeemShown = true;
+  }
+
+  if (card && !cardLast && !redeemCooldown) {
     redeemPoints(uid);
   }
-  
-  // Si siguen insertando metal, volver a recolección
-  if (metalDetected && !metalWasDetected) {
+
+  if (metal && !metalLast) {
     points += pointsPerMetal;
-    Serial.print("🧲 Metal detectado - Puntos: ");
-    Serial.println(points);
-    
-    openAndCloseServo();
-    
-    currentState = STATE_COLLECTING;
+    openServoAsync();
     display->showPoints(points);
+
+    collectingShown = false;
+    redeemShown = false;
+
+    currentState = STATE_COLLECTING;
     lastActivity = millis();
   }
-  metalWasDetected = metalDetected;
 }
 
-void StateManager::openAndCloseServo() {
+void StateManager::openServoAsync() {
   servo->open();
-  delay(2000);
-  servo->close();
+  servoOpen = true;
+  servoTimer = millis();
 }
 
 void StateManager::redeemPoints(String uid) {
@@ -123,25 +188,41 @@ void StateManager::redeemPoints(String uid) {
   Serial.print("💰 Canjeando ");
   Serial.print(points);
   Serial.println(" puntos");
-  
-  display->showRedeemSuccess(points);
-  delay(3000);
-  
-  resetToWelcome();
+
+  lastRedeemedUID = uid;
+
+  display->showRedeemSuccess(points, uid);
+
+  // Activar cooldown para evitar canjes múltiples
+  redeemCooldown = true;
+  redeemCooldownTimer = millis();
+
+  redeemWait = true;
+  redeemTimer = millis();
 }
 
 void StateManager::resetToWelcome() {
   points = 0;
+
+  metalLast = false;
+  cardLast = false;
+
+  welcomeShown = true;
+  collectingShown = false;
+  redeemShown = false;
+
   currentState = STATE_WELCOME;
   display->showWelcome();
-  Serial.println("Estado: BIENVENIDA");
-  lastActivity = millis();
 }
 
-State StateManager::getCurrentState() {
-  return currentState;
+String StateManager::getLastRedeemedUID() {
+  return lastRedeemedUID;
 }
 
-int StateManager::getPoints() {
-  return points;
+String StateManager::getLastDetectedUID() {
+  return lastUID;
+}
+
+unsigned long StateManager::getLastActivity() {
+  return lastActivity;
 }

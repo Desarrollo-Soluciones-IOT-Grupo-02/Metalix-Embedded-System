@@ -1,7 +1,6 @@
 #include "DisplayOLED.h"
 #include <Wire.h>
 
-// ==== PON AQUÍ TU ARRAY CONVERTIDO ====
 const unsigned char metalix_logo [] PROGMEM = {
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
@@ -74,7 +73,22 @@ DisplayOLED::DisplayOLED(int width, int height)
 
 bool DisplayOLED::begin() {
     Wire.begin(21, 22);
-    return oled.begin(SSD1306_SWITCHCAPVCC, 0x3C);
+    Wire.setClock(400000);
+    
+    bool success = oled.begin(SSD1306_SWITCHCAPVCC, 0x3C);
+    
+    if (success) {
+        oled.ssd1306_command(0xDA);
+        oled.ssd1306_command(0x12);
+        
+        oled.ssd1306_command(0xD3);
+        oled.ssd1306_command(0x00); 
+        
+        oled.clearDisplay();
+        oled.display();
+    }
+    
+    return success;
 }
 
 void DisplayOLED::showLogo() {
@@ -94,63 +108,94 @@ void DisplayOLED::showMessage(const String& msg) {
 
 void DisplayOLED::showWelcome() {
     oled.clearDisplay();
+    
+    oled.drawRect(1, 1, 126, 62, SSD1306_WHITE);
+    oled.drawRect(3, 3, 122, 58, SSD1306_WHITE);
+    
     oled.setTextSize(1);
     oled.setTextColor(SSD1306_WHITE);
-    oled.setCursor(5, 15);
-    oled.println("  Ingrese un");
-    oled.setCursor(5, 30);
-    oled.println(" metal para");
-    oled.setCursor(5, 45);
-    oled.println("   iniciar");
+    
+    oled.setCursor(16, 26);
+    oled.print("Ingrese metal");
+    
+    oled.setCursor(22, 40);
+    oled.print("para iniciar");
+    
     oled.display();
 }
 
 void DisplayOLED::showPoints(int points) {
     oled.clearDisplay();
+    
+    oled.drawRect(2, 2, 124, 60, SSD1306_WHITE);
+    
     oled.setTextSize(1);
     oled.setTextColor(SSD1306_WHITE);
     
-    oled.setCursor(25, 5);
-    oled.println("PUNTOS:");
+    oled.setCursor(45, 8);
+    oled.print("PUNTOS");
     
-    oled.setTextSize(3);
-    oled.setCursor(45, 25);
-    oled.println(points);
+    oled.drawLine(10, 18, 118, 18, SSD1306_WHITE);
+    
+    oled.setTextSize(2);
+    String ptsStr = String(points);
+    int ptsWidth = ptsStr.length() * 12;
+    int ptsX = (128 - ptsWidth) / 2;
+    oled.setCursor(ptsX, 26);
+    oled.print(points);
     
     oled.setTextSize(1);
-    oled.setCursor(10, 55);
-    oled.println("Siga insertando");
+    oled.setCursor(10, 48);
+    oled.print("Siga insertando");
     
     oled.display();
 }
 
 void DisplayOLED::showRedeemMessage() {
     oled.clearDisplay();
+    
+    oled.drawRect(1, 1, 126, 62, SSD1306_WHITE);
+    oled.drawRect(3, 3, 122, 58, SSD1306_WHITE);
+    
     oled.setTextSize(1);
     oled.setTextColor(SSD1306_WHITE);
-    oled.setCursor(15, 20);
-    oled.println("Pase su tarjeta");
-    oled.setCursor(20, 35);
-    oled.println("para canjear");
+    
+    oled.fillRect(48, 12, 32, 18, SSD1306_WHITE);
+    oled.fillRect(50, 14, 28, 14, SSD1306_BLACK);
+    oled.drawLine(50, 20, 78, 20, SSD1306_WHITE);
+    
+    oled.setCursor(10, 36);
+    oled.print("Pase su tarjeta");
+    
+    oled.setCursor(22, 48);
+    oled.print("para canjear");
+    
     oled.display();
 }
 
 void DisplayOLED::showRedeemSuccess(int points) {
     oled.clearDisplay();
-    oled.setTextSize(1);
-    oled.setTextColor(SSD1306_WHITE);
     
-    oled.setCursor(25, 10);
-    oled.println("CANJEADO!");
+    oled.drawRect(2, 2, 124, 60, SSD1306_WHITE);
     
     oled.setTextSize(2);
-    oled.setCursor(30, 30);
-    oled.print(points);
-    oled.println(" pts");
+    oled.setTextColor(SSD1306_WHITE);
+    
+    oled.setCursor(16, 6);
+    oled.print("CANJEADO!");
+    
+    oled.drawLine(10, 24, 118, 24, SSD1306_WHITE);
+    
+    oled.setTextSize(2);
+    String ptsText = String(points) + " pts";
+    int ptsWidth = ptsText.length() * 12;
+    int ptsX = (128 - ptsWidth) / 2;
+    oled.setCursor(ptsX, 30);
+    oled.print(ptsText);
     
     oled.setTextSize(1);
-    oled.setCursor(25, 55);
-    oled.println("Gracias!");
+    oled.setCursor(40, 50);
+    oled.print("Gracias!");
     
     oled.display();
 }

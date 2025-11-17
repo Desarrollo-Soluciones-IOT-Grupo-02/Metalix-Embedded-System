@@ -16,6 +16,8 @@ public:
     void showRedeemSuccess(int points, String uid);
     void showWiFiConnecting(int dots);
     void showWiFiConnected(String ip);
+    void showMQTTConnecting(int dots);
+    void showMQTTConnected();
     void clear();
 
 private:

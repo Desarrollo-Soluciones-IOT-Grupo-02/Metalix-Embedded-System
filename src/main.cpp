@@ -6,6 +6,7 @@
 #include "sensors/MetalSensor.h"
 #include "servo/ServoMotor.h"
 #include "display/DisplayOLED.h"
+#include "mqtt/MQTTManager.h"
 
 // Pines
 #define SENSOR_PIN 26
@@ -17,6 +18,12 @@
 #define OLED_SDA 4
 #define OLED_SCL 5
 
+// Configuración MQTT (con TLS sin certificados)
+#define MQTT_SERVER "broker.hivemq.com"
+#define MQTT_PORT 8883
+#define MQTT_USERNAME nullptr
+#define MQTT_PASSWORD nullptr
+
 // Parámetros
 #define POINTS_PER_METAL 10
 #define IDLE_TIMEOUT 15000
@@ -27,6 +34,7 @@ NFCReader nfc(PN532_SDA, PN532_SCL);
 DisplayOLED display(128, 64, &Wire1);
 
 WiFiManager wifi("Ray", "10021976@", LED_BUILTIN, &display);
+MQTTManager mqtt(MQTT_SERVER, MQTT_PORT, MQTT_USERNAME, MQTT_PASSWORD, &display, LED_BUILTIN);
 
 StateManager state(&metal, &servo, &nfc, &display,
                     POINTS_PER_METAL, IDLE_TIMEOUT);
@@ -50,11 +58,19 @@ void setup() {
   // Conectar WiFi con animación en OLED
   wifi.begin();
 
+  // Inicializar MQTT
+  mqtt.begin();
+  mqtt.connect();
+
+  Serial.print("Client ID MQTT: ");
+  Serial.println(mqtt.getClientId());
+
   // Iniciar estado
   state.begin();
 }
 
 void loop() {
   state.update();
+  mqtt.loop();
   delay(30);
 }

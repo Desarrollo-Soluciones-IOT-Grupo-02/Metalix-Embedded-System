@@ -290,6 +290,55 @@ void DisplayOLED::showWiFiConnected(String ip) {
     delay(5000);
 }
 
+void DisplayOLED::showMQTTConnecting(int dots) {
+    oled->clearDisplay();
+
+    // Marco doble elegante
+    oled->drawRect(1, 1, 126, 62, SSD1306_WHITE);
+    oled->drawRect(3, 3, 122, 58, SSD1306_WHITE);
+
+    oled->setTextSize(1);
+    oled->setTextColor(SSD1306_WHITE);
+
+    // Título centrado
+    String title = "Conectando MQTT";
+    int16_t x1, y1; uint16_t w, h;
+    oled->getTextBounds(title, 0, 0, &x1, &y1, &w, &h);
+    oled->setCursor((128 - w) / 2, 20);
+    oled->print(title);
+
+    // Animación de puntos
+    String dotsStr = "";
+    for (int i = 0; i < dots; i++) dotsStr += ".";
+
+    oled->getTextBounds(dotsStr, 0, 0, &x1, &y1, &w, &h);
+    oled->setCursor((128 - w) / 2, 38);
+    oled->print(dotsStr);
+
+    oled->display();
+}
+
+void DisplayOLED::showMQTTConnected() {
+    oled->clearDisplay();
+
+    // Marco doble
+    oled->drawRect(1, 1, 126, 62, SSD1306_WHITE);
+    oled->drawRect(3, 3, 122, 58, SSD1306_WHITE);
+
+    oled->setTextSize(1);
+    oled->setTextColor(SSD1306_WHITE);
+
+    // Título centrado
+    String title = "MQTT Conectado!";
+    int16_t x1, y1; uint16_t w, h;
+    oled->getTextBounds(title, 0, 0, &x1, &y1, &w, &h);
+    oled->setCursor((128 - w) / 2, 25);
+    oled->print(title);
+
+    oled->display();
+    delay(3000); // Mostrar por 3 segundos
+}
+
 void DisplayOLED::clear() {
     oled->clearDisplay();
     oled->display();

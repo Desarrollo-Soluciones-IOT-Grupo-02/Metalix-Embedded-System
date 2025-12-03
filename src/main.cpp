@@ -18,11 +18,12 @@
 #define OLED_SDA 4
 #define OLED_SCL 5
 
-// Configuración MQTT (con TLS sin certificados)
-#define MQTT_SERVER "broker.hivemq.com"
+// Configuración MQTT - HiveMQ Cloud
+#define MQTT_SERVER "e7801d833ee0419bbad9bceac294aa93.s1.eu.hivemq.cloud"
 #define MQTT_PORT 8883
-#define MQTT_USERNAME nullptr
-#define MQTT_PASSWORD nullptr
+// TODO: Reemplazar con tus credenciales de Access Management
+#define MQTT_USERNAME "Metalix"
+#define MQTT_PASSWORD "Metalix@2025"
 
 // Parámetros
 #define POINTS_PER_METAL 10
@@ -37,7 +38,38 @@ WiFiManager wifi("Ray", "10021976@", LED_BUILTIN, &display);
 MQTTManager mqtt(MQTT_SERVER, MQTT_PORT, MQTT_USERNAME, MQTT_PASSWORD, &display, LED_BUILTIN);
 
 StateManager state(&metal, &servo, &nfc, &display,
-                    POINTS_PER_METAL, IDLE_TIMEOUT);
+                    POINTS_PER_METAL, IDLE_TIMEOUT, &mqtt);
+
+// Callback para mensajes MQTT recibidos
+void onMqttMessage(char* topic, byte* payload, unsigned int length) {
+  Serial.print("📩 Mensaje recibido en [");
+  Serial.print(topic);
+  Serial.print("]: ");
+  
+  // Convertir payload a String
+  String message = "";
+  for (unsigned int i = 0; i < length; i++) {
+    message += (char)payload[i];
+    Serial.print((char)payload[i]);
+  }
+  Serial.println();
+  
+  // Procesar comandos si es el tópico correcto
+  if (String(topic) == mqtt.getTopicCommands()) {
+    // Parsear comando (formato simple: {"action":"block_by_weight"})
+    if (message.indexOf("unblock_by_weight") > 0) {
+      Serial.println("✅ Comando recibido: Desbloquear");
+      state.unblockByWeight();
+    }
+    else if (message.indexOf("block_by_weight") > 0) {
+      Serial.println("🚫 Comando recibido: Bloquear por peso");
+      state.blockByWeight();
+    }
+    else {
+      Serial.println("⚠️  Comando no reconocido");
+    }
+  }
+}
 
 void setup() {
   Serial.begin(115200);
@@ -60,10 +92,16 @@ void setup() {
 
   // Inicializar MQTT
   mqtt.begin();
-  mqtt.connect();
-
-  Serial.print("Client ID MQTT: ");
-  Serial.println(mqtt.getClientId());
+  mqtt.setMessageCallback(onMqttMessage);
+  mqtt.setStateManager(&state); // Pasar referencia del StateManager
+  mqtt.enableAutoStatus(30000); // Publicar estado cada 30 segundos
+  
+  if (mqtt.connect()) {
+    Serial.print("✅ Client ID MQTT: ");
+    Serial.println(mqtt.getClientId());
+  } else {
+    Serial.println("⚠️  MQTT no conectado, se reintentará automáticamente...");
+  }
 
   // Iniciar estado
   state.begin();

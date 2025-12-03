@@ -101,6 +101,32 @@ void DisplayOLED::showMessage(const String& msg) {
     oled->display();
 }
 
+void DisplayOLED::showMessage(const String& title, const String& subtitle) {
+    oled->clearDisplay();
+    
+    // Marco doble
+    oled->drawRect(1, 1, 126, 62, SSD1306_WHITE);
+    oled->drawRect(3, 3, 122, 58, SSD1306_WHITE);
+    
+    // Título centrado
+    oled->setTextSize(1);
+    oled->setTextColor(SSD1306_WHITE);
+    
+    int16_t x1, y1;
+    uint16_t w, h;
+    
+    oled->getTextBounds(title, 0, 0, &x1, &y1, &w, &h);
+    oled->setCursor((128 - w) / 2, 18);
+    oled->print(title);
+    
+    // Subtítulo centrado
+    oled->getTextBounds(subtitle, 0, 0, &x1, &y1, &w, &h);
+    oled->setCursor((128 - w) / 2, 36);
+    oled->print(subtitle);
+    
+    oled->display();
+}
+
 void DisplayOLED::showWelcome() {
     oled->clearDisplay();
 

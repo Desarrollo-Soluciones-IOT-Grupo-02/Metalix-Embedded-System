@@ -10,6 +10,7 @@ public:
     bool begin();
     void showLogo();
     void showMessage(const String& msg);
+    void showMessage(const String& title, const String& subtitle);
     void showWelcome();
     void showPoints(int points);
     void showRedeemMessage();
